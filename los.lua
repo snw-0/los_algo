@@ -2,8 +2,65 @@
 -- (see http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html)
 -- Implemented by Samuel Wilson
 
+local los = {vis_map = {}}
 local Slope = {}
 Slope.__index = Slope
+
+local map_width = 48
+local map_height = 24
+
+function los.compute(ox, oy, range)
+	los.vis_map = {}
+	map_width = map.width
+	map_height = map.height
+	range = range or math.max(map_width, map_height)
+
+	_set_visible(ox, oy, 0)
+	for octant = 1, 8 do
+		_compute_octant(octant, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1))
+	end
+end
+
+function los.visible(x, y)
+	return los.vis_map[_hash(x, y)]
+end
+
+---
+
+local HASHMOD = 512
+function _hash(x,y)
+	return x * HASHMOD + y
+end
+
+function _unhash(hash)
+	return math.floor(hash / HASHMOD), hash % HASHMOD
+end
+
+---
+
+-- A function that accepts the X and Y coordinates of a tile
+-- and determines whether the given tile blocks the passage of light.
+-- The function must be able to accept coordinates that are out of bounds.
+-- Pulled out of map.lua.
+function _blocks_light(x, y)
+	return x<1 or x>map_width or y<1 or y>map_height or map[x][y].feat == "wall"
+end
+
+-- A function that sets a tile to be visible, given its X and Y coordinates.
+-- The function must ignore coordinates that are out of bounds.
+function _set_visible(x, y, distance)
+	if x>=1 and x<=map_width and y>=1 and y<=map_height then
+		los.vis_map[_hash(x,y)] = distance
+	end
+end
+
+-- A function that takes the X and Y coordinate of a point where X >= 0,
+-- Y >= 0, and X >= Y, and returns the distance from the point to the origin (0,0).
+local _get_distance = math.max
+
+---
+
+-- Struct for holding rational slopes.
 
 function Slope.new(y, x)
 	return setmetatable({y = y or 0, x = x or 0}, Slope)
@@ -28,62 +85,6 @@ end
 function Slope:geq(by, bx)
 	return self.y * bx >= self.x * by
 end
-
----
-
-local los = {vis_map = {}}
-
-local map_width = 48
-local map_height = 24
-
-function los.compute(ox, oy, range)
-	los.vis_map = {}
-	map_width = map.width
-	map_height = map.height
-	range = range or math.max(map_width, map_height)
-
-	_set_visible(ox, oy)
-	for octant = 1, 8 do
-		_compute_octant(octant, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1))
-	end
-end
-
-function los.visible(x, y)
-	return los.vis_map[_hash(x, y)]
-end
-
----
-
-local HASHMOD = 512
-function _hash(x,y)
-	return x * HASHMOD + y
-end
-
-function _unhash(hash)
-	return math.floor(hash / HASHMOD), hash % HASHMOD
-end
-
----
-
--- <param name="blocksLight"> A function that accepts the X and Y coordinates of a tile
--- and determines whether the given tile blocks the passage of light.
--- The function must be able to accept coordinates that are out of bounds.
-
--- local _blocks_light = map.blocks_light
-
--- <param name="setVisible">A function that sets a tile to be visible, given its X and Y coordinates.
--- The function must ignore coordinates that are out of bounds.
-
-function _set_visible(x, y)
-	if x>=1 and x<=map_width and y>=1 and y<=map_height then
-		los.vis_map[_hash(x,y)] = true
-	end
-end
-
--- <param name="getDistance">A function that takes the X and Y coordinate of a point where X >= 0,
--- Y >= 0, and X >= Y, and returns the distance from the point to the origin (0,0).
-
-local _get_distance = math.max
 
 ---
 
@@ -306,7 +307,7 @@ function _blocks_light_octant(x, y, octant, ox, oy)
 		oy = oy + y
 	end
 
-	return map:feat_at(ox, oy) == "wall"
+	return _blocks_light(ox, oy)
 end
 
 function _set_visible_octant(x, y, octant, ox, oy)
@@ -336,7 +337,8 @@ function _set_visible_octant(x, y, octant, ox, oy)
 		oy = oy + y
 	end
 
-	return _set_visible(ox, oy)
+	-- x >= y, so distance = x
+	return _set_visible(ox, oy, x)
 end
 
 return los

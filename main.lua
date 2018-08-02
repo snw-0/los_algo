@@ -9,10 +9,13 @@ function floor_setup()
 
 	-- place the player, XXX find a cool place instead of just a random one
 	player.x, player.y = map:find_empty_floor()
+	new_turn(false)
 end
 
-function new_turn()
-	cturn = cturn + 1
+function new_turn(time_passed)
+	if time_passed then
+		cturn = cturn + 1
+	end
 	los.compute(player.x, player.y)
 	redraw = true
 end
@@ -55,11 +58,10 @@ function love.load()
 
 	player = {id = player, x=1, y=1}
 
-	cturn = 0
+	cturn = 1
 	floor_setup()
 
 	game_state = "play"
-	new_turn()
 end
 
 -- function love.update(dt)
@@ -139,6 +141,9 @@ function love.keypressed(key, unicode)
 			end
 			new_message("Computed " .. n .. " cycles")
 		end
+		if key == "r" then
+			floor_setup()
+		end
 	end
 end
 
@@ -177,7 +182,7 @@ end
 function try_player_step(dx, dy)
 	if map:is_floor(player.x + dx, player.y + dy) then
 		player.x, player.y = player.x + dx, player.y + dy
-		new_turn()
+		new_turn(true)
 	else
 		new_message("Ouch! (" .. player.x + dx .. ", " .. player.y + dy .. ")")
 	end

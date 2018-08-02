@@ -39,10 +39,12 @@ function map:tile_at(x, y)
 			return self:feat_at(x, y), color.rgb("red")
 		end
 	else
-		if los.visible(x, y) then
-			return self:feat_at(x, y), color.rgb("ltgrey")
+		local distance = los.visible(x, y)
+		if distance then
+			distance = math.max(1, distance)
+			return self:feat_at(x, y), 1 / distance, 1 / distance, 1 / distance
 		else
-			return self:feat_at(x, y), color.rgb("blue")
+			return self:feat_at(x, y), color.rgb("dkblue")
 		end
 	end
 end
