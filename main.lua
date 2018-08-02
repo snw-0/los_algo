@@ -130,6 +130,15 @@ function love.keypressed(key, unicode)
 		if key == "kp7" then try_player_step(-1,-1) end
 		if key == "kp8" or key == "w" then try_player_step(0,-1) end
 		if key == "kp9" then try_player_step(1,-1) end
+		if key == "t" then
+			local end_time = love.timer.getTime() + 1
+			local n = 0
+			while love.timer.getTime() < end_time do
+				los.compute(player.x, player.y)
+				n = n+1
+			end
+			new_message("Computed " .. n .. " cycles")
+		end
 	end
 end
 
