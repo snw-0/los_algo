@@ -1,3 +1,7 @@
+-- Adam Milazzo's LOS algorithm (partially-symmetrical version)
+-- (see http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html)
+-- Implemented by Samuel Wilson
+
 local Slope = {}
 Slope.__index = Slope
 
