@@ -2,38 +2,30 @@
 -- (see http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html)
 -- Implemented by Samuel Wilson
 
-local los = {vis_map = {}}
+local los = {}
 local Slope = {}
 Slope.__index = Slope
 
 local map_width = 48
 local map_height = 24
 
-function los.compute(ox, oy, range)
-	los.vis_map = {}
+function los.compute(ox, oy, _set_visible, _blocks_light, range)
 	map_width = map.width
 	map_height = map.height
+
+	_set_visible = _set_visible
+	_blocks_light = _blocks_light
+
 	range = range or math.max(map_width, map_height)
 
 	_set_visible(ox, oy, 0)
 	for octant = 1, 8 do
-		_compute_octant(octant, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1))
+		_compute_octant(octant, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1), _set_visible, _blocks_light)
 	end
 end
 
 function los.visible(x, y)
-	return los.vis_map[_hash(x, y)]
-end
-
----
-
-local HASHMOD = 512
-function _hash(x,y)
-	return x * HASHMOD + y
-end
-
-function _unhash(hash)
-	return math.floor(hash / HASHMOD), hash % HASHMOD
+	return player.vis_map[mymath.hash(x, y)]
 end
 
 ---
@@ -42,15 +34,15 @@ end
 -- and determines whether the given tile blocks the passage of light.
 -- The function must be able to accept coordinates that are out of bounds.
 -- Pulled out of map.lua.
-function _blocks_light(x, y)
+function los.blocks_light_default(x, y)
 	return x<1 or x>map_width or y<1 or y>map_height or map[x][y].feat == "wall"
 end
 
 -- A function that sets a tile to be visible, given its X and Y coordinates.
 -- The function must ignore coordinates that are out of bounds.
-function _set_visible(x, y, distance)
+function los.set_visible_player(x, y, distance)
 	if x>=1 and x<=map_width and y>=1 and y<=map_height then
-		los.vis_map[_hash(x,y)] = distance
+		player.vis_map[mymath.hash(x,y)] = distance
 	end
 end
 
@@ -88,7 +80,7 @@ end
 
 ---
 
-function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
+function _compute_octant(octant, ox, oy, range, start_x, top, bottom, _set_visible, _blocks_light)
 
 	-- throughout this function there are references to various parts of tiles. a tile's coordinates refer to its
 	-- center, and the following diagram shows the parts of the tile and the vectors from the origin that pass through
@@ -120,7 +112,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 			topY = math.floor(((x * 2 - 1) * top.y + top.x) / (top.x * 2)) -- the Y coordinate of the tile entered from the left
 			-- now it's possible that the vector passes from the left side of the tile up into the tile above before
 			-- exiting from the right side of this column. so we may need to increment topY
-			if _blocks_light_octant(x, topY, octant, ox, oy) then -- if the tile blocks light (i.e. is a wall)...
+			if _blocks_light_octant(x, topY, octant, ox, oy, _blocks_light) then -- if the tile blocks light (i.e. is a wall)...
 				-- if the tile entered from the left blocks light, whether it passes into the tile above depends on the shape
 				-- of the wall tile as well as the angle of the vector. if the tile has does not have a beveled top-left
 				-- corner, then it is blocked. the corner is beveled if the tiles above and to the left are not walls. we can
@@ -130,7 +122,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 				-- otherwise, with a beveled top-left corner, the slope of the vector must be greater than or equal to the
 				-- slope of the vector to the top center of the tile (x*2, topY*2+1) in order for it to miss the wall and
 				-- pass into the tile above
-				if top:geq(topY * 2 + 1, x * 2) and (not _blocks_light_octant(x, topY + 1, octant, ox, oy)) then
+				if top:geq(topY * 2 + 1, x * 2) and (not _blocks_light_octant(x, topY + 1, octant, ox, oy, _blocks_light)) then
 					topY = topY + 1
 				end
 			else -- the tile doesn't block light
@@ -157,7 +149,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 				-- there's no point in incrementing topY even if light passes through the corner of the tile above. so we
 				-- might as well use the bottom center for both cases.
 				local ax = x * 2 -- center
-				if _blocks_light_octant(x + 1, topY + 1, octant, ox, oy) then
+				if _blocks_light_octant(x + 1, topY + 1, octant, ox, oy, _blocks_light) then
 					ax = ax + 1 -- use bottom-right if the tile above and right is a wall
 				end
 				if top:gt(topY * 2 + 1, ax) then
@@ -178,8 +170,8 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 			-- is beveled and bottom >= (bottomY*2+1)/(x*2). finally, the top-left corner is beveled if the tiles to the
 			-- left and above are clear. we can assume the tile to the left is clear because otherwise the bottom vector
 			-- would be greater, so we only have to check above
-			if bottom:geq(bottomY * 2 + 1, x * 2) and _blocks_light_octant(x, bottomY, octant, ox, oy)
-				and (not _blocks_light_octant(x, bottomY + 1, octant, ox, oy)) then
+			if bottom:geq(bottomY * 2 + 1, x * 2) and _blocks_light_octant(x, bottomY, octant, ox, oy, _blocks_light)
+				and (not _blocks_light_octant(x, bottomY + 1, octant, ox, oy, _blocks_light)) then
 				bottomY = bottomY + 1
 			end
 		end
@@ -188,7 +180,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 		local was_opaque = -1 -- 0:false, 1:true, -1:not applicable
 		for y = topY, bottomY, -1 do -- use a signed comparison because y can wrap around when decremented???
 			if _get_distance(x, y) <= range then -- skip the tile if it's out of visual range
-				local is_opaque = _blocks_light_octant(x, y, octant, ox, oy)
+				local is_opaque = _blocks_light_octant(x, y, octant, ox, oy, _blocks_light)
 				-- every tile where topY > y > bottomY is guaranteed to be visible. also, the code that initializes topY and
 				-- bottomY guarantees that if the tile is opaque then it's visible. so we only have to do extra work for the
 				-- case where the tile is clear and y == topY or y == bottomY. if y == topY then we have to make sure that
@@ -201,7 +193,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 				local is_visible = is_opaque or ((y ~= topY or top:geq(y, x)) and (y ~= bottomY or bottom:leq(y, x)))
 
 				if is_visible then
-					_set_visible_octant(x, y, octant, ox, oy)
+					_set_visible_octant(x, y, octant, ox, oy, _set_visible)
 				end
 
 				-- if we found a transition from clear to opaque or vice versa, adjust the top and bottom vectors
@@ -217,7 +209,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 							local nx = x * 2
 							local ny = y * 2 + 1 -- top center by default
 							-- NOTE: if you're using full symmetry and want more expansive walls (recommended), comment out the next line
-							if _blocks_light_octant(x, y+1, octant, ox, oy) then
+							if _blocks_light_octant(x, y+1, octant, ox, oy, _blocks_light) then
 								nx = nx - 1 -- top left if the corner is not beveled
 							end
 							if top:gt(ny, nx) then
@@ -229,7 +221,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 									bottom = Slope.new(ny, nx)
 									break -- don't recurse unless necessary
 								else
-									_compute_octant(octant, ox, oy, range, x + 1, top, Slope.new(ny, nx))
+									_compute_octant(octant, ox, oy, range, x + 1, top, Slope.new(ny, nx), _set_visible, _blocks_light)
 								end
 							else
 								-- the new bottom is greater than or equal to the top, so the new sector is empty and we'll ignore
@@ -249,7 +241,7 @@ function _compute_octant(octant, ox, oy, range, start_x, top, bottom)
 							local nx = x * 2
 							local ny = y * 2 + 1 -- the bottom of the opaque tile (oy*2-1) equals the top of this tile (y*2+1)
 							-- NOTE: if you're using full symmetry and want more expansive walls (recommended), comment out the next line
-							if _blocks_light_octant(x+1, y+1, octant, ox, oy) then
+							if _blocks_light_octant(x+1, y+1, octant, ox, oy, _blocks_light) then
 								nx = nx + 1 -- check the right of the opaque tile (y+1), not this one
 							end
 							-- we have to maintain the invariant that top > bottom. if not, the sector is empty and we're done
@@ -280,7 +272,7 @@ end
 -- NOTE: the code duplication between BlocksLight and SetVisible is for performance. don't refactor the octant
 -- translation out unless you don't mind an 18% drop in speed
 
-function _blocks_light_octant(x, y, octant, ox, oy)
+function _blocks_light_octant(x, y, octant, ox, oy, _blocks_light)
 	if octant == 1 then
 		ox = ox + x
 		oy = oy - y
@@ -310,7 +302,7 @@ function _blocks_light_octant(x, y, octant, ox, oy)
 	return _blocks_light(ox, oy)
 end
 
-function _set_visible_octant(x, y, octant, ox, oy)
+function _set_visible_octant(x, y, octant, ox, oy, _set_visible)
 	if octant == 1 then
 		ox = ox + x
 		oy = oy - y

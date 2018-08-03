@@ -7,9 +7,16 @@ function img.setup()
 	img.tileset:setFilter("nearest", "linear")
 
 	img.nq("player", 				0, 0)
-	img.nq("void", 					1, 0)
-	img.nq("floor", 				0, 1)
-	img.nq("wall", 					1, 1)
+	img.nq("void", 					3, 0)
+
+	img.nq("floor3", 				0, 1)
+	img.nq("floor2", 				1, 1)
+	img.nq("floor1", 				2, 1)
+	img.nq("floor0", 				3, 1)
+	img.nq("wall3", 				0, 2)
+	img.nq("wall2", 				1, 2)
+	img.nq("wall1", 				2, 2)
+	img.nq("wall0", 				3, 2)
 
 	img.tileset_batch = love.graphics.newSpriteBatch(img.tileset, 2000)
 end

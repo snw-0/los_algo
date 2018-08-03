@@ -1,6 +1,7 @@
 color = require "color"
 img = require "img"
 map = require "map"
+light = require "light"
 los = require "los"
 mymath = require "mymath"
 
@@ -16,7 +17,7 @@ function new_turn(time_passed)
 	if time_passed then
 		cturn = cturn + 1
 	end
-	los.compute(player.x, player.y)
+	compute_player_los()
 	redraw = true
 end
 
@@ -136,7 +137,7 @@ function love.keypressed(key, unicode)
 			local end_time = love.timer.getTime() + 1
 			local n = 0
 			while love.timer.getTime() < end_time do
-				los.compute(player.x, player.y)
+				compute_player_los()
 				n = n+1
 			end
 			new_message("Computed " .. n .. " cycles")
@@ -149,17 +150,19 @@ end
 
 function love.mousepressed(x, y)
 	update_cursor(x, y)
-	if cursor_x ~= player.x or cursor_y ~= player.y then
-		if map:feat_at(cursor_x, cursor_y) == "wall" then
-			map[cursor_x][cursor_y].feat = "floor"
-			los.compute(player.x, player.y)
-			redraw = true
-		elseif map:feat_at(cursor_x, cursor_y) == "floor" then
-			map[cursor_x][cursor_y].feat = "wall"
-			los.compute(player.x, player.y)
-			redraw = true
+	-- if cursor_x ~= player.x or cursor_y ~= player.y then
+	-- 	if map:feat_at(cursor_x, cursor_y) == "wall" then
+	-- 		map[cursor_x][cursor_y].feat = "floor"
+	-- 		new_turn(false)
+	-- 	elseif map:feat_at(cursor_x, cursor_y) == "floor" then
+	-- 		map[cursor_x][cursor_y].feat = "wall"
+	-- 		new_turn(false)
+	-- 	end
+	-- end
+	if map:feat_at(cursor_x, cursor_y) == "floor" then
+			light.cast(cursor_x, cursor_y, 1, 3, 7)
+			new_turn(false)
 		end
-	end
 end
 
 function update_cursor(mouse_x, mouse_y)
@@ -186,6 +189,11 @@ function try_player_step(dx, dy)
 	else
 		new_message("Ouch! (" .. player.x + dx .. ", " .. player.y + dy .. ")")
 	end
+end
+
+function compute_player_los()
+	player.vis_map = {}
+	los.compute(player.x, player.y, los.set_visible_player, los.blocks_light_default, 48)
 end
 
 function love.focus(f)

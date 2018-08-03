@@ -15,6 +15,8 @@ function map:setup(w, h)
 			end
 		end
 	end
+
+	light.map = {}
 end
 
 function map:feat_at(x, y)
@@ -27,25 +29,32 @@ end
 
 function map:tile_at(x, y)
 	if not self:in_bounds(x, y) then
+		-- shouldn't happen
 		return "void", color.rgb("purple")
 	end
 
 	if x == player.x and y == player.y then
 		return "player", color.rgb("green")
-	elseif x == cursor_x and y == cursor_y then
-		if los.visible(x, y) then
-			return self:feat_at(x, y), color.rgb("orange")
-		else
-			return self:feat_at(x, y), color.rgb("red")
-		end
 	else
-		local distance = los.visible(x, y)
-		if distance then
-			distance = math.max(1, distance)
-			return self:feat_at(x, y), 1 / distance, 1 / distance, 1 / distance
+		-- draw the feature
+		local brightness = light.map[mymath.hash(x, y)] or 0
+		local visible = los.visible(x, y)
+		local r,g,b = 1, 0, 1
+
+		if x == cursor_x and y == cursor_y then
+			if los.visible(x, y) then
+				r,g,b = color.rgb("orange")
+			else
+				r,g,b = color.rgb("red")
+			end
+		elseif los.visible(x,y) then
+			r,g,b = 0.2 + 0.3 * brightness, 0.2 + 0.3 * brightness, 0.2 + 0.3 * brightness
 		else
-			return self:feat_at(x, y), color.rgb("dkblue")
+			return -- draw nothing
+			-- r,g,b = color.rgb("dkred")
 		end
+
+		return self:feat_at(x, y) .. brightness, r, g, b
 	end
 end
 

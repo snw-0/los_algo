@@ -42,4 +42,13 @@ function mymath.dir(a,b, x,y)
 	return mymath.sign(x-a), mymath.sign(y-b)
 end
 
+local HASHMOD = 512
+function mymath.hash(x,y)
+	return x * HASHMOD + y
+end
+
+function mymath.unhash(hash)
+	return math.floor(hash / HASHMOD), hash % HASHMOD
+end
+
 return mymath
