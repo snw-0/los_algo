@@ -148,21 +148,22 @@ function love.keypressed(key, unicode)
 	end
 end
 
-function love.mousepressed(x, y)
+function love.mousepressed(x, y, button)
 	update_cursor(x, y)
-	-- if cursor_x ~= player.x or cursor_y ~= player.y then
-	-- 	if map:feat_at(cursor_x, cursor_y) == "wall" then
-	-- 		map[cursor_x][cursor_y].feat = "floor"
-	-- 		new_turn(false)
-	-- 	elseif map:feat_at(cursor_x, cursor_y) == "floor" then
-	-- 		map[cursor_x][cursor_y].feat = "wall"
-	-- 		new_turn(false)
-	-- 	end
-	-- end
-	if map:feat_at(cursor_x, cursor_y) == "floor" then
-			light.cast(cursor_x, cursor_y, 1, 3, 7)
-			new_turn(false)
+	if button == 1 then
+		if cursor_x ~= player.x or cursor_y ~= player.y then
+			if map:feat_at(cursor_x, cursor_y) == "wall" then
+				map[cursor_x][cursor_y].feat = "floor"
+				new_turn(false)
+			elseif map:feat_at(cursor_x, cursor_y) == "floor" then
+				map[cursor_x][cursor_y].feat = "wall"
+				new_turn(false)
+			end
 		end
+	elseif map:feat_at(cursor_x, cursor_y) == "floor" then
+		light.cast(cursor_x, cursor_y, 1, 3, 7)
+		new_turn(false)
+	end
 end
 
 function update_cursor(mouse_x, mouse_y)
