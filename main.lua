@@ -130,16 +130,20 @@ function love.keypressed(key, unicode)
 		end
 		if key == "q" then love.event.push("quit") end
 	elseif game_state == "play" then
+		local move_intent = love.keyboard.isDown("lshift") and "turn" or "try_step"
+
 		if key == "escape" then pause() end
-		if key == "kp1" or key == "z" then player.try_step(-1,1) end
-		if key == "kp2" or key == "x" then player.try_step(0,1) end
-		if key == "kp3" or key == "c" then player.try_step(1,1) end
-		if key == "kp4" or key == "a" then player.try_step(-1,0) end
+		if key == "kp1" or key == "z" then player[move_intent](-1,1) end
+		if key == "kp2" or key == "x" then player[move_intent](0,1) end
+		if key == "kp3" or key == "c" then player[move_intent](1,1) end
+		if key == "kp4" or key == "a" then player[move_intent](-1,0) end
 		-- if key == "kp5" then player:key_skip_turn() end
-		if key == "kp6" or key == "d" then player.try_step(1,0) end
-		if key == "kp7" or key == "q" then player.try_step(-1,-1) end
-		if key == "kp8" or key == "w" then player.try_step(0,-1) end
-		if key == "kp9" or key == "e" then player.try_step(1,-1) end
+		if key == "kp6" or key == "d" then player[move_intent](1,0) end
+		if key == "kp7" or key == "q" then player[move_intent](-1,-1) end
+		if key == "kp8" or key == "w" then player[move_intent](0,-1) end
+		if key == "kp9" or key == "e" then player[move_intent](1,-1) end
+		if key == "f" then player.switch_flashlight() end
+
 		if key == "t" then
 			local end_time = love.timer.getTime() + 1
 			local n = 0

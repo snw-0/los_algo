@@ -5,8 +5,10 @@ local hash = mymath.hash
 function light.update()
 	-- update the temp grid, but don't touch the permanent one
 	light.temporary_grid = {}
-	light.cast(player.x, player.y, 1, 3, 7, false,
-		light.get_octants_from_dir(player.face_x, player.face_y))
+	if player.flashlight_on then
+		light.cast(player.x, player.y, 1, 3, 7, false,
+			light.get_octants_from_dir(player.face_x, player.face_y))
+	end
 end
 
 function light.cast(x, y, r1, r2, r3, permanent, octants)
