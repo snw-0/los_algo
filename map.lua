@@ -1,80 +1,102 @@
-local map = {}
+local Map = {}
+Map.__index = Map
 
-function map:setup(w, h)
-	self.width = w
-	self.height = h
+local hash = mymath.hash
+local unhash = mymath.hash
 
+function Map.new(w, h)
+	return setmetatable({ width = w or 0, height = h or 0 }, Map)
+end
+
+function Map:setup_mainmap()
+	-- build mainmap and get things ready for the first player turn
 	for x=1, self.width do
-		self[x] = {}
 		for y=1, self.height do
-			self[x][y] = {}
 			if x==1 or x==self.width or y==1 or y==self.height or mymath.one_chance_in(8) then
-				self[x][y].feat = "wall"
+				self:set(x, y, "feat", "wall")
 			else
-				self[x][y].feat = "floor"
+				self:set(x, y, "feat", "floor")
 			end
 		end
 	end
 
-	light.map = {}
+	light.grid = {}
 end
 
-function map:feat_at(x, y)
+function Map:in_bounds(x, y)
+	return x>=1 and x<=self.width and y>=1 and y<=self.height
+end
+
+local h
+function Map:set(x, y, k, v)
+	-- debug
 	if not self:in_bounds(x, y) then
-		return "void" -- the void
-	else
-		return self[x][y].feat
+		error("bad coords ("..x..","..y..")")
 	end
+	h = hash(x, y)
+	if not self[h] then
+		self[h] = {}
+	end
+	self[h][k] = v
 end
 
-function map:tile_at(x, y)
+function Map:get(x, y, k)
+	-- debug
+	if not self:in_bounds(x, y) then
+		error("bad coords ("..x..","..y..")")
+	end
+	h = hash(x, y)
+	if not self[h] then
+		return nil
+	end
+	return self[h][k]
+end
+
+function Map:tile_at(x, y)
 	if not self:in_bounds(x, y) then
 		-- shouldn't happen
 		return "void", color.rgb("purple")
 	end
 
 	if x == player.x and y == player.y then
-		return "player", color.rgb("green")
+		--obviously i can see MYSELF, mom, GAWD
+		return "player", color.rgb("green" .. light.get(x,y))
 	else
-		-- draw the feature
-		local brightness = light.map[mymath.hash(x, y)] or 0
-		local visible = los.visible(x, y)
-		local r,g,b = 1, 0, 1
+		local brightness = light.get(x,y)
+		local visible = player.visible(x, y) and (brightness > 0)
 
-		if x == cursor_x and y == cursor_y then
-			if los.visible(x, y) then
-				r,g,b = color.rgb("orange")
-			else
-				r,g,b = color.rgb("red")
-			end
-		elseif los.visible(x,y) then
-			r,g,b = 0.2 + 0.3 * brightness, 0.2 + 0.3 * brightness, 0.2 + 0.3 * brightness
+		if visible then
+			-- draw what we see
+			return self:get(x, y, "feat") .. brightness, color.rgb("light" .. brightness)
 		else
-			return -- draw nothing
-			-- r,g,b = color.rgb("dkred")
+			-- draw whatever we remember being here before
+			-- if the feat is nil we won't draw anything
+			local feat = player.memory_map:get(x, y, "feat")
+			if feat then
+				brightness = player.memory_map:get(x, y, "brightness") or 0
+				return feat .. brightness, color.rgb("grey0")
+			end
 		end
-
-		return self:feat_at(x, y) .. brightness, r, g, b
 	end
 end
 
-function map:in_bounds(x, y)
-	return x>=1 and x<=self.width and y>=1 and y<=self.height
+function Map:is_floor(x, y)
+	return self:get(x, y, "feat") == "floor"
 end
 
-function map:is_floor(x, y)
-	return self:feat_at(x, y) == "floor"
-end
-
-function map:find_empty_floor()
+function Map:find_empty_floor()
 	local x = love.math.random(2, self.width-1)
 	local y = love.math.random(2, self.height-1)
 
-	while self[x][y].feat ~= "floor" do
+	while self:get(x, y, "feat") ~= "floor" do
 		x = love.math.random(2, self.width-1)
 		y = love.math.random(2, self.height-1)
 	end
 	return x, y
 end
 
-return map
+function Map:blocks_light(x, y)
+	return (not self:in_bounds(x,y)) or self:get(x, y, "feat") == "wall"
+end
+
+return Map

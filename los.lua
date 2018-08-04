@@ -8,24 +8,25 @@ Slope.__index = Slope
 
 local map_width = 48
 local map_height = 24
+local hash = mymath.hash
 
-function los.compute(ox, oy, _set_visible, _blocks_light, range)
-	map_width = map.width
-	map_height = map.height
+function los.compute(ox, oy, _set_visible, _blocks_light, range, octants)
+	map_width = mainmap.width
+	map_height = mainmap.height
 
 	_set_visible = _set_visible
-	_blocks_light = _blocks_light
+	_blocks_light = _blocks_light or _blocks_light_default
 
 	range = range or math.max(map_width, map_height)
 
-	_set_visible(ox, oy, 0)
-	for octant = 1, 8 do
-		_compute_octant(octant, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1), _set_visible, _blocks_light)
-	end
-end
+	octants = octants or {1,2,3,4,5,6,7,8}
 
-function los.visible(x, y)
-	return player.vis_map[mymath.hash(x, y)]
+	if not _blocks_light(ox, oy) then
+		_set_visible(ox, oy, 0)
+		for i,v in ipairs(octants) do
+			_compute_octant(v, ox, oy, range, 1, Slope.new(1, 1), Slope.new(0, 1), _set_visible, _blocks_light)
+		end
+	end
 end
 
 ---
@@ -34,17 +35,21 @@ end
 -- and determines whether the given tile blocks the passage of light.
 -- The function must be able to accept coordinates that are out of bounds.
 -- Pulled out of map.lua.
-function los.blocks_light_default(x, y)
-	return x<1 or x>map_width or y<1 or y>map_height or map[x][y].feat == "wall"
+function _blocks_light_default(x, y)
+	return mainmap:blocks_light(x, y)
 end
 
 -- A function that sets a tile to be visible, given its X and Y coordinates.
 -- The function must ignore coordinates that are out of bounds.
-function los.set_visible_player(x, y, distance)
-	if x>=1 and x<=map_width and y>=1 and y<=map_height then
-		player.vis_map[mymath.hash(x,y)] = distance
-	end
-end
+-- function los.set_visible_player(x, y, distance)
+-- 	if x>=1 and x<=map_width and y>=1 and y<=map_height then
+-- 		player.vis_grid[hash(x,y)] = distance
+
+-- 		if light.get(x,y) > 0 then
+-- 			player.memorize_feat(x,y)
+-- 		end
+-- 	end
+-- end
 
 -- A function that takes the X and Y coordinate of a point where X >= 0,
 -- Y >= 0, and X >= Y, and returns the distance from the point to the origin (0,0).

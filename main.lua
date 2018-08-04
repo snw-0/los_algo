@@ -1,31 +1,32 @@
-color = require "color"
-img = require "img"
-map = require "map"
-light = require "light"
-los = require "los"
 mymath = require "mymath"
 
-function floor_setup()
-	map:setup(48, 24)
+color = require "color"
+img = require "img"
+Map = require "Map"
+light = require "light"
+los = require "los"
+player = require "player"
 
-	-- place the player, XXX find a cool place instead of just a random one
-	player.x, player.y = map:find_empty_floor()
-	new_turn(false)
+function floor_setup()
+	local mainmap = Map.new(48,24)
+	mainmap:setup_mainmap()
+	return mainmap
 end
 
 function new_turn(time_passed)
 	if time_passed then
 		cturn = cturn + 1
 	end
-	compute_player_los()
+	light.update()
+	player.compute_los()
 	redraw = true
 end
 
 function draw_pause_menu()
 	love.graphics.setColor(color.blue)
-	love.graphics.circle("fill", window.w/2, window.h/2, 200)
+	love.graphics.circle("fill", window_w/2, window_h/2, 200)
 	love.graphics.setColor(color.white)
-	love.graphics.printf("Press Q to quit", math.floor(window.w/2 - 200), math.floor(window.h/2 - font:getHeight()/2), 400, "center")
+	love.graphics.printf("Press Q to quit", math.floor(window_w/2 - 200), math.floor(window_h/2 - font:getHeight()/2), 400, "center")
 	love.graphics.setColor(color.white)
 end
 
@@ -36,10 +37,9 @@ end
 
 function love.load()
 	ctime = 0
-	window = {}
-	window.w, window.h = 1024, 640
+	window_w, window_h = 1024, 640
 
-	love.window.setMode(window.w, window.h)
+	love.window.setMode(window_w, window_h)
 	love.graphics.setBackgroundColor(0, 0, 0)
 	canvas = love.graphics.newCanvas()
 	shaderDesaturate = love.graphics.newShader("desaturate.lua")
@@ -57,10 +57,10 @@ function love.load()
 	cursor_x = -99
 	cursor_y = -99
 
-	player = {id = player, x=1, y=1}
-
 	cturn = 1
-	floor_setup()
+	mainmap = floor_setup(48, 24)
+	player.setup()
+	new_turn(false)
 
 	game_state = "play"
 end
@@ -86,18 +86,19 @@ function love.draw()
 		-- update and draw the new view to canvas
 		img.update_tileset_batch()
 		love.graphics.draw(img.tileset_batch,
-						   (window.w / 2) - (map.width * img.tile_size / 2),
-						   (window.h / 2) - (map.height * img.tile_size / 2))
+						   (window_w / 2) - (mainmap.width * img.tile_size / 2),
+						   (window_h / 2) - (mainmap.height * img.tile_size / 2))
 
 		-- gui stuff
 
 		love.graphics.setColor(color.purple)
-		love.graphics.print("Turn:  "..cturn, window.w - 320, 80)
+
+		love.graphics.print("Turn:  "..cturn, window_w - 320, 80)
 		-- debug msg
 	    -- love.graphics.print("FPS: "..love.timer.getFPS(), 20, window.h - 80)
 	    -- message
 	    if message then
-	    	love.graphics.print(message, 20, window.h - 40)
+	    	love.graphics.print(message, 20, window_h - 40)
 	    end
 	    love.graphics.setColor(color.white)
 
@@ -113,7 +114,13 @@ function love.draw()
 	-- copy canvas to screen
 	love.graphics.draw(canvas, 0, 0)
 
-	love.graphics.circle("line", mouse_x, mouse_y, 5)
+	love.graphics.setColor(color.purple)
+	love.graphics.draw(img.tileset, img.tile["cursor"],
+						(cursor_x - 1) * img.tile_size + (window_w / 2) - (mainmap.width * img.tile_size / 2),
+						(cursor_y - 1) * img.tile_size + (window_h / 2) - (mainmap.height * img.tile_size / 2))
+
+	love.graphics.setColor(color.white)
+	love.graphics.circle("fill", mouse_x, mouse_y, 2)
 end
 
 function love.keypressed(key, unicode)
@@ -124,20 +131,20 @@ function love.keypressed(key, unicode)
 		if key == "q" then love.event.push("quit") end
 	elseif game_state == "play" then
 		if key == "escape" then pause() end
-		if key == "kp1" then try_player_step(-1,1) end
-		if key == "kp2" or key == "s" then try_player_step(0,1) end
-		if key == "kp3" then try_player_step(1,1) end
-		if key == "kp4" or key == "a" then try_player_step(-1,0) end
+		if key == "kp1" or key == "z" then player.try_step(-1,1) end
+		if key == "kp2" or key == "x" then player.try_step(0,1) end
+		if key == "kp3" or key == "c" then player.try_step(1,1) end
+		if key == "kp4" or key == "a" then player.try_step(-1,0) end
 		-- if key == "kp5" then player:key_skip_turn() end
-		if key == "kp6" or key == "d" then try_player_step(1,0) end
-		if key == "kp7" then try_player_step(-1,-1) end
-		if key == "kp8" or key == "w" then try_player_step(0,-1) end
-		if key == "kp9" then try_player_step(1,-1) end
+		if key == "kp6" or key == "d" then player.try_step(1,0) end
+		if key == "kp7" or key == "q" then player.try_step(-1,-1) end
+		if key == "kp8" or key == "w" then player.try_step(0,-1) end
+		if key == "kp9" or key == "e" then player.try_step(1,-1) end
 		if key == "t" then
 			local end_time = love.timer.getTime() + 1
 			local n = 0
 			while love.timer.getTime() < end_time do
-				compute_player_los()
+				player.compute_los()
 				n = n+1
 			end
 			new_message("Computed " .. n .. " cycles")
@@ -152,49 +159,33 @@ function love.mousepressed(x, y, button)
 	update_cursor(x, y)
 	if button == 1 then
 		if cursor_x ~= player.x or cursor_y ~= player.y then
-			if map:feat_at(cursor_x, cursor_y) == "wall" then
-				map[cursor_x][cursor_y].feat = "floor"
+			if mainmap:get(cursor_x, cursor_y, "feat") == "wall" then
+				mainmap:set(cursor_x, cursor_y, "feat", "floor")
 				new_turn(false)
-			elseif map:feat_at(cursor_x, cursor_y) == "floor" then
-				map[cursor_x][cursor_y].feat = "wall"
+			elseif mainmap:get(cursor_x, cursor_y, "feat") == "floor" then
+				mainmap:set(cursor_x, cursor_y, "feat", "wall")
 				new_turn(false)
 			end
 		end
-	elseif map:feat_at(cursor_x, cursor_y) == "floor" then
-		light.cast(cursor_x, cursor_y, 1, 3, 7)
+	elseif mainmap:get(cursor_x, cursor_y, "feat") == "floor" then
+		light.cast(cursor_x, cursor_y, 1, 3, 7, true)
 		new_turn(false)
 	end
 end
 
 function update_cursor(mouse_x, mouse_y)
-	local new_cursor_x = 1 + math.floor((mouse_x - (window.w / 2) + (map.width * img.tile_size / 2)) / img.tile_size)
-	local new_cursor_y = 1 + math.floor((mouse_y - (window.h / 2) + (map.height * img.tile_size / 2)) / img.tile_size)
-	if map:in_bounds(new_cursor_x, new_cursor_y) then
+	local new_cursor_x = 1 + math.floor((mouse_x - (window_w / 2) + (mainmap.width * img.tile_size / 2)) / img.tile_size)
+	local new_cursor_y = 1 + math.floor((mouse_y - (window_h / 2) + (mainmap.height * img.tile_size / 2)) / img.tile_size)
+	if mainmap:in_bounds(new_cursor_x, new_cursor_y) then
 		if new_cursor_x ~= cursor_x or new_cursor_y ~= cursor_y then
 			-- set cursor
 			cursor_x = new_cursor_x
 			cursor_y = new_cursor_y
-			redraw = true
 		end
 	elseif cursor_x ~= -99 or cursor_y ~= -99 then
 		cursor_x = -99
 		cursor_y = -99
-		redraw = true
 	end
-end
-
-function try_player_step(dx, dy)
-	if map:is_floor(player.x + dx, player.y + dy) then
-		player.x, player.y = player.x + dx, player.y + dy
-		new_turn(true)
-	else
-		new_message("Ouch! (" .. player.x + dx .. ", " .. player.y + dy .. ")")
-	end
-end
-
-function compute_player_los()
-	player.vis_map = {}
-	los.compute(player.x, player.y, los.set_visible_player, los.blocks_light_default, 48)
 end
 
 function love.focus(f)
