@@ -14,13 +14,15 @@ function Map:setup_mainmap()
 		for y=1, self.height do
 			if x==1 or x==self.width or y==1 or y==self.height or mymath.one_chance_in(8) then
 				self:set(x, y, "feat", "wall")
+			elseif mymath.one_chance_in(32) then
+				self:set(x, y, "feat", "doorc")
+			elseif mymath.one_chance_in(32) then
+				self:set(x, y, "feat", "dooro")
 			else
 				self:set(x, y, "feat", "floor")
 			end
 		end
 	end
-
-	light.grid = {}
 end
 
 function Map:in_bounds(x, y)
@@ -55,7 +57,7 @@ end
 function Map:tile_at(x, y)
 	if not self:in_bounds(x, y) then
 		-- shouldn't happen
-		return "void", color.rgb("purple")
+		return "void", color.rgb("purple2")
 	end
 
 	if x == player.x and y == player.y then
@@ -80,8 +82,9 @@ function Map:tile_at(x, y)
 	end
 end
 
-function Map:is_floor(x, y)
-	return self:get(x, y, "feat") == "floor"
+function Map:can_walk(x, y)
+	local feat = self:get(x, y, "feat")
+	return feat == "floor" or feat == "dooro" or feat == "doorc"
 end
 
 function Map:find_empty_floor()
@@ -95,8 +98,17 @@ function Map:find_empty_floor()
 	return x, y
 end
 
+function Map:actor_at(x, y)
+	-- return an actor id, or nil if empty
+	return self:in_bounds(x,y) and self:get(x,y,"actor")
+end
+
 function Map:blocks_light(x, y)
-	return (not self:in_bounds(x,y)) or self:get(x, y, "feat") == "wall"
+	if self:in_bounds(x,y) then
+		local feat = self:get(x, y, "feat")
+		return feat == "wall" or feat == "doorc"
+	end
+	return true
 end
 
 return Map

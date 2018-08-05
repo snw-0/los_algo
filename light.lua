@@ -1,14 +1,28 @@
-local light = {permanent_grid = {}, temporary_grid = {}}
+local light = {permanent_grid = {}, temporary_grid = {}, lights = {}}
 
 local hash = mymath.hash
 
 function light.update()
-	-- update the temp grid, but don't touch the permanent one
+	-- update permanent grid only if necessary
+	if light.needs_rebuild then
+		light.permanent_grid = {}
+		for i,v in ipairs(light.lights) do
+			light.cast(v.x, v.y, v.r1, v.r2, v.r3, true)
+		end
+		light.needs_rebuild = false
+	end
+
+	-- update the temp grid always
 	light.temporary_grid = {}
 	if player.flashlight_on then
 		light.cast(player.x, player.y, 1, 3, 7, false,
 			light.get_octants_from_dir(player.face_x, player.face_y))
 	end
+end
+
+function light.create(x,y,r1,r2,r3)
+	table.insert(light.lights, {x=x, y=y, r1=r1, r2=r2, r3=r3})
+	light.needs_rebuild = true
 end
 
 function light.cast(x, y, r1, r2, r3, permanent, octants)

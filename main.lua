@@ -8,9 +8,22 @@ los = require "los"
 player = require "player"
 
 function floor_setup()
-	local mainmap = Map.new(48,24)
+	mainmap = Map.new(48,24)
 	mainmap:setup_mainmap()
-	return mainmap
+
+	-- place the player, XXX find a cool place instead of just a random one
+	local x,y = mainmap:find_empty_floor()
+	player.set_location(x,y)
+
+	light.lights = {}
+	for i = 1, 2 do
+		local x, y = mainmap:find_empty_floor()
+		light.create(x, y, 1, 3, 7)
+	end
+
+	player.reset_memory()
+	light.needs_rebuild = true
+	redraw = true
 end
 
 function new_turn(time_passed)
@@ -30,8 +43,8 @@ function draw_pause_menu()
 	love.graphics.setColor(color.white)
 end
 
-function new_message(m)
-	message = m
+function new_message(m, color)
+	table.insert(messages, 1, {str = m, color = color, turn = cturn})
 	redraw = true
 end
 
@@ -53,13 +66,15 @@ function love.load()
 		"123456789.,!?-+/():;%&`'*#=[]\"")
 	love.graphics.setFont(font)
 
+	messages = {}
+
 	img.setup()
 	cursor_x = -99
 	cursor_y = -99
 
 	cturn = 1
-	mainmap = floor_setup(48, 24)
-	player.setup()
+	mainmap = nil
+	floor_setup()
 	new_turn(false)
 
 	game_state = "play"
@@ -91,16 +106,26 @@ function love.draw()
 
 		-- gui stuff
 
-		love.graphics.setColor(color.purple)
+		love.graphics.setColor(color.purple2)
 
 		love.graphics.print("Turn:  "..cturn, window_w - 320, 80)
 		-- debug msg
-	    -- love.graphics.print("FPS: "..love.timer.getFPS(), 20, window.h - 80)
-	    -- message
-	    if message then
-	    	love.graphics.print(message, 20, window_h - 40)
-	    end
-	    love.graphics.setColor(color.white)
+		-- love.graphics.print("FPS: "..love.timer.getFPS(), 20, window.h - 80)
+
+		-- message
+		local age
+		local line = 0
+		for i,v in ipairs(messages) do
+			age = math.max(cturn - v.turn - 1, 0)
+			if age >= 4 then
+				messages[i] = nil
+			else
+				love.graphics.setColor(color[v.color .. (3 - age)])
+	    		love.graphics.print(v.str, 20, window_h - (40 + 20 * line))
+	    		line = line + 1
+	    	end
+		end
+		love.graphics.setColor(color.white)
 
 		if game_state == "pause" then
 			love.graphics.setShader()
@@ -114,13 +139,16 @@ function love.draw()
 	-- copy canvas to screen
 	love.graphics.draw(canvas, 0, 0)
 
-	love.graphics.setColor(color.purple)
+	love.graphics.setColor(color.purple3)
 	love.graphics.draw(img.tileset, img.tile["cursor"],
 						(cursor_x - 1) * img.tile_size + (window_w / 2) - (mainmap.width * img.tile_size / 2),
 						(cursor_y - 1) * img.tile_size + (window_h / 2) - (mainmap.height * img.tile_size / 2))
 
 	love.graphics.setColor(color.white)
 	love.graphics.circle("fill", mouse_x, mouse_y, 2)
+	if mainmap:in_bounds(cursor_x, cursor_y) then
+		love.graphics.print(mainmap:get(cursor_x, cursor_y, "actor") or "none", window_w - 60, window_h - 40)
+	end
 end
 
 function love.keypressed(key, unicode)
@@ -130,31 +158,85 @@ function love.keypressed(key, unicode)
 		end
 		if key == "q" then love.event.push("quit") end
 	elseif game_state == "play" then
-		local move_intent = love.keyboard.isDown("lshift") and "turn" or "try_step"
-
-		if key == "escape" then pause() end
-		if key == "kp1" or key == "z" then player[move_intent](-1,1) end
-		if key == "kp2" or key == "x" then player[move_intent](0,1) end
-		if key == "kp3" or key == "c" then player[move_intent](1,1) end
-		if key == "kp4" or key == "a" then player[move_intent](-1,0) end
-		-- if key == "kp5" then player:key_skip_turn() end
-		if key == "kp6" or key == "d" then player[move_intent](1,0) end
-		if key == "kp7" or key == "q" then player[move_intent](-1,-1) end
-		if key == "kp8" or key == "w" then player[move_intent](0,-1) end
-		if key == "kp9" or key == "e" then player[move_intent](1,-1) end
-		if key == "f" then player.switch_flashlight() end
-
-		if key == "t" then
-			local end_time = love.timer.getTime() + 1
-			local n = 0
-			while love.timer.getTime() < end_time do
-				player.compute_los()
-				n = n+1
+		if player.control_state == "interact" then
+			if key == "escape" then
+				new_message("Nevermind.", "grey")
+				player.control_state = nil
 			end
-			new_message("Computed " .. n .. " cycles")
-		end
-		if key == "r" then
-			floor_setup()
+			if key == "kp1" or key == "z" then
+				player.interact(-1,1)
+				player.control_state = nil
+			end
+			if key == "kp2" or key == "x" then
+				player.interact(0,1)
+				player.control_state = nil
+			end
+			if key == "kp3" or key == "c" then
+				player.interact(1,1)
+				player.control_state = nil
+			end
+			if key == "kp4" or key == "a" then
+				player.interact(-1,0)
+				player.control_state = nil
+			end
+			if key == "kp6" or key == "d" then
+				player.interact(1,0)
+				player.control_state = nil
+			end
+			if key == "kp7" or key == "q" then
+				player.interact(-1,-1)
+				player.control_state = nil
+			end
+			if key == "kp8" or key == "w" then
+				player.interact(0,-1)
+				player.control_state = nil
+			end
+			if key == "kp9" or key == "e" then
+				player.interact(1,-1)
+				player.control_state = nil
+			end
+		else
+			if key == "escape" then pause() end
+			local move_intent = love.keyboard.isDown("lshift") and "set_facing" or "try_step"
+			if key == "kp1" or key == "z" then player[move_intent](-1,1) end
+			if key == "kp2" or key == "x" then player[move_intent](0,1) end
+			if key == "kp3" or key == "c" then player[move_intent](1,1) end
+			if key == "kp4" or key == "a" then player[move_intent](-1,0) end
+			-- if key == "kp5" then player:key_skip_turn() end
+			if key == "kp6" or key == "d" then player[move_intent](1,0) end
+			if key == "kp7" or key == "q" then player[move_intent](-1,-1) end
+			if key == "kp8" or key == "w" then player[move_intent](0,-1) end
+			if key == "kp9" or key == "e" then player[move_intent](1,-1) end
+			if key == "f" then player.switch_flashlight() end
+
+			if key == "t" then
+				local end_time = love.timer.getTime() + 1
+				local n = 0
+				while love.timer.getTime() < end_time do
+					player.compute_los()
+					n = n+1
+				end
+				new_message("Computed " .. n .. " cycles", "purple")
+			end
+			if key == "r" then
+				floor_setup()
+				new_turn(false)
+			end
+			if key == "n" then
+				for x = 1, mainmap.width do
+					for y = 1, mainmap.height do
+						player.memorize_feat(x,y)
+					end
+				end
+				new_turn(false)
+			end
+			if key == "m" then
+				player.reset_memory()
+				new_turn(false)
+			end
+			if key == "space" then
+				player.control_state = "interact"
+			end
 		end
 	end
 end
@@ -172,7 +254,7 @@ function love.mousepressed(x, y, button)
 			end
 		end
 	elseif mainmap:get(cursor_x, cursor_y, "feat") == "floor" then
-		light.cast(cursor_x, cursor_y, 1, 3, 7, true)
+		light.create(cursor_x, cursor_y, 1, 3, 7)
 		new_turn(false)
 	end
 end
